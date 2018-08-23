@@ -4,7 +4,7 @@
 
 #include "dma.h"
 
-#define NEOPIXEL_RESET_BUFFER_LENGTH 90
+#define NEOPIXEL_RESET_BUFFER_LENGTH 100
 
 static uint8_t neopixel_data[NEOPIXEL_NUM_LEDS * 3 * 3 + NEOPIXEL_RESET_BUFFER_LENGTH];
 
@@ -75,6 +75,9 @@ void neopixel_init() {
 }
 
 void neopixel_begin() {
+  for (int i = 0; i < NEOPIXEL_NUM_LEDS; i++) {
+    neopixel_clear(i);
+  }
   dma_start_neopixel();
 }
 

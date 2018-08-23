@@ -25,14 +25,10 @@
 SawOsc saw_oscs[] = {SawOsc(57), SawOsc(58), SawOsc(59), SawOsc(60), SawOsc(61),
                      SawOsc(62), SawOsc(63), SawOsc(64), SawOsc(65), SawOsc(66),
                      SawOsc(67), SawOsc(68), SawOsc(69)};
-SquareOsc square_oscs[] = {SquareOsc(57), SquareOsc(58), SquareOsc(59), SquareOsc(60),
-                           SquareOsc(61), SquareOsc(62), SquareOsc(63), SquareOsc(64),
-                           SquareOsc(65), SquareOsc(66), SquareOsc(67), SquareOsc(68),
-                           SquareOsc(69)};
 uint16_t voice_mask = 0;
 
 DelayLineULaw delay_line(4000);
-// ReverbFDN4 reverb;
+ReverbFDN4 reverb;
 SVF svf(1000);
 int16_t freq_inc = 1;
 
@@ -62,32 +58,30 @@ void audio_callback(uint16_t* buf, uint16_t len) {
     for (int i = 0; i < 16; i++) {
       if (voice_mask & (1 << i)) {
         q15_t saw = saw_oscs[i].tick();
-        q15_t square = square_oscs[i].tick();
         int16_t osc_mix_frac = (accel_sensor[0] >> 1) + 0x8000;
         osc_mix_frac = 0x7EEE;
-        int32_t osc_mix = osc_mix_frac * saw + (0x7EEE - osc_mix_frac) * square;
-        mix.add(osc_mix >> 15);
+        mix.add(saw);
       }
     }
 
     mix.asr_floor(3);
 
-    //svf.tick(mix.hard_clip());
-    //mix.set(svf.low());
+    svf.tick(mix.hard_clip());
+    mix.set(svf.low());
 
     Accumulator feedback(delay_line.read());
     Accumulator dry_mix(mix);
-    mix.add(feedback.soft_clip());
+    mix.add(feedback.hard_clip());
     feedback.mul_int(3);
     feedback.asr_round(2);
     feedback.add(dry_mix);
     if (numticks & 0x1)
-      delay_line.write(feedback.soft_clip());
+      delay_line.write(feedback.hard_clip());
 
-    // q15_t mix_reverb = reverb.tick(mix.soft_clip());
-    // mix.add(mix_reverb >> 1);
+    q15_t mix_reverb = reverb.tick(mix.hard_clip());
+    mix.add(mix_reverb >> 1);
 
-    buf[i] = ((int32_t)mix.hard_clip() + 0x8000) >> 6;
+    buf[i] = ((int32_t)mix.soft_clip() + 0x8000) >> 6;
   }
 }
 
@@ -107,35 +101,35 @@ void control_callback() {
   //  if (touch_active[4]) new_voice_mask |= 0x0084;
   //  if (touch_active[5]) new_voice_mask |= 0x0210;
   //  if (touch_active[6]) new_voice_mask |= 0x0820;
-  //  if (touch_active & (1 << 0)) new_voice_mask |= 0x0001;
-  //  if (touch_active & (1 << 1)) new_voice_mask |= 0x0004;
-  //  if (touch_active & (1 << 2)) new_voice_mask |= 0x0010;
-  //  if (touch_active & (1 << 3)) new_voice_mask |= 0x0020;
-  //  if (touch_active & (1 << 4)) new_voice_mask |= 0x0080;
-  //  if (touch_active & (1 << 5)) new_voice_mask |= 0x0200;
-  //  if (touch_active & (1 << 6)) new_voice_mask |= 0x0800;
-  if (touch_active & (1 << 0))
-    new_voice_mask |= 0x0081;
-  if (touch_active & (1 << 1))
-    new_voice_mask |= 0x0204;
-  if (touch_active & (1 << 2))
-    new_voice_mask |= 0x0810;
-  if (touch_active & (1 << 3))
-    new_voice_mask |= 0x1020;
-  if (touch_active & (1 << 4))
-    new_voice_mask |= 0x0084;
-  if (touch_active & (1 << 5))
-    new_voice_mask |= 0x0210;
-  if (touch_active & (1 << 6))
-    new_voice_mask |= 0x0820;
+  if (touch_active & (1 << 0)) new_voice_mask |= 0x0001;
+  if (touch_active & (1 << 1)) new_voice_mask |= 0x0004;
+  if (touch_active & (1 << 2)) new_voice_mask |= 0x0010;
+  if (touch_active & (1 << 3)) new_voice_mask |= 0x0020;
+  if (touch_active & (1 << 4)) new_voice_mask |= 0x0080;
+  if (touch_active & (1 << 5)) new_voice_mask |= 0x0200;
+  if (touch_active & (1 << 6)) new_voice_mask |= 0x0800;
+  //if (touch_active & (1 << 0))
+  //  new_voice_mask |= 0x0081;
+  //if (touch_active & (1 << 1))
+  //  new_voice_mask |= 0x0204;
+  //if (touch_active & (1 << 2))
+  //  new_voice_mask |= 0x0810;
+  //if (touch_active & (1 << 3))
+  //  new_voice_mask |= 0x1020;
+  //if (touch_active & (1 << 4))
+  //  new_voice_mask |= 0x0084;
+  //if (touch_active & (1 << 5))
+  //  new_voice_mask |= 0x0210;
+  //if (touch_active & (1 << 6))
+  //  new_voice_mask |= 0x0820;
 
   voice_mask = new_voice_mask;
 
-  for (int i = 0; i < 7; i++) {
-    if (touch_active & (1 << i)) {
-      neopixel_set(9 - i, 0x08, 0x10, 0x00);
+  for (int i = 0; i < NEOPIXEL_NUM_LEDS; i++) {
+    if (i < 7 && (touch_active & (1 << i))) {
+      neopixel_set(NEOPIXEL_NUM_LEDS - 1 - i, 0x08, 0x04, 0x00);
     } else {
-      neopixel_clear(9 - i);
+      neopixel_set(NEOPIXEL_NUM_LEDS - 1 - i, 0x02, 0x00, 0x00);
     }
   }
   // Serial.println(voice_mask);

@@ -4,47 +4,29 @@
 #include "audio.h"
 #include "dsp_accumulator.h"
 
-// Assume 24000kHz sample rate, 16 bit phase
-const uint16_t midi_note_phase_inc[128] = {
-    22,    24,    25,    27,    28,    30,    32,    33,    35,    38,    40,    42,    45,
-    47,    50,    53,    56,    60,    63,    67,    71,    75,    80,    84,    89,    95,
-    100,   106,   113,   119,   126,   134,   142,   150,   159,   169,   179,   189,   200,
-    212,   225,   238,   253,   268,   284,   300,   318,   337,   357,   378,   401,   425,
-    450,   477,   505,   535,   567,   601,   636,   674,   714,   757,   802,   850,   900,
-    954,   1010,  1070,  1134,  1201,  1273,  1349,  1429,  1514,  1604,  1699,  1800,  1907,
-    2021,  2141,  2268,  2403,  2546,  2697,  2858,  3028,  3208,  3398,  3600,  3815,  4041,
-    4282,  4536,  4806,  5092,  5395,  5715,  6055,  6415,  6797,  7201,  7629,  8083,  8563,
-    9072,  9612,  10184, 10789, 11431, 12110, 12830, 13593, 14402, 15258, 16165, 17127, 18145,
-    19224, 20367, 21578, 22861, 24221, 25661, 27187, 28803, 30516, 32331, 34253};
+#define AUDIO_BITS 15
+#define SR_SHIFT 6
 
-const uint8_t sine_wave[256] = {
-    0x80, 0x83, 0x86, 0x89, 0x8C, 0x90, 0x93, 0x96, 0x99, 0x9C, 0x9F, 0xA2, 0xA5, 0xA8, 0xAB, 0xAE,
-    0xB1, 0xB3, 0xB6, 0xB9, 0xBC, 0xBF, 0xC1, 0xC4, 0xC7, 0xC9, 0xCC, 0xCE, 0xD1, 0xD3, 0xD5, 0xD8,
-    0xDA, 0xDC, 0xDE, 0xE0, 0xE2, 0xE4, 0xE6, 0xE8, 0xEA, 0xEB, 0xED, 0xEF, 0xF0, 0xF1, 0xF3, 0xF4,
-    0xF5, 0xF6, 0xF8, 0xF9, 0xFA, 0xFA, 0xFB, 0xFC, 0xFD, 0xFD, 0xFE, 0xFE, 0xFE, 0xFF, 0xFF, 0xFF,
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFE, 0xFE, 0xFD, 0xFD, 0xFC, 0xFB, 0xFA, 0xFA, 0xF9, 0xF8, 0xF6,
-    0xF5, 0xF4, 0xF3, 0xF1, 0xF0, 0xEF, 0xED, 0xEB, 0xEA, 0xE8, 0xE6, 0xE4, 0xE2, 0xE0, 0xDE, 0xDC,
-    0xDA, 0xD8, 0xD5, 0xD3, 0xD1, 0xCE, 0xCC, 0xC9, 0xC7, 0xC4, 0xC1, 0xBF, 0xBC, 0xB9, 0xB6, 0xB3,
-    0xB1, 0xAE, 0xAB, 0xA8, 0xA5, 0xA2, 0x9F, 0x9C, 0x99, 0x96, 0x93, 0x90, 0x8C, 0x89, 0x86, 0x83,
-    0x80, 0x7D, 0x7A, 0x77, 0x74, 0x70, 0x6D, 0x6A, 0x67, 0x64, 0x61, 0x5E, 0x5B, 0x58, 0x55, 0x52,
-    0x4F, 0x4D, 0x4A, 0x47, 0x44, 0x41, 0x3F, 0x3C, 0x39, 0x37, 0x34, 0x32, 0x2F, 0x2D, 0x2B, 0x28,
-    0x26, 0x24, 0x22, 0x20, 0x1E, 0x1C, 0x1A, 0x18, 0x16, 0x15, 0x13, 0x11, 0x10, 0x0F, 0x0D, 0x0C,
-    0x0B, 0x0A, 0x08, 0x07, 0x06, 0x06, 0x05, 0x04, 0x03, 0x03, 0x02, 0x02, 0x02, 0x01, 0x01, 0x01,
-    0x01, 0x01, 0x01, 0x01, 0x02, 0x02, 0x02, 0x03, 0x03, 0x04, 0x05, 0x06, 0x06, 0x07, 0x08, 0x0A,
-    0x0B, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x13, 0x15, 0x16, 0x18, 0x1A, 0x1C, 0x1E, 0x20, 0x22, 0x24,
-    0x26, 0x28, 0x2B, 0x2D, 0x2F, 0x32, 0x34, 0x37, 0x39, 0x3C, 0x3F, 0x41, 0x44, 0x47, 0x4A, 0x4D,
-    0x4F, 0x52, 0x55, 0x58, 0x5B, 0x5E, 0x61, 0x64, 0x67, 0x6A, 0x6D, 0x70, 0x74, 0x77, 0x7A, 0x7D};
+// 24kHz sample rate, 22 bit phase
+#define PHASE_BITS 22
+extern const int32_t midi_note_phase_inc[128];
 
-int16_t sample_8_interp(const uint8_t* table, uint16_t phase) {
-  uint16_t phase_int = phase >> 8;
-  uint16_t phase_frac = phase & 0xFF;
+// Q22
+extern const int32_t midi_note_freq_inv[128];
 
-  uint16_t sA = table[phase_int] * (0x100 - phase_frac);
-  uint16_t sB = table[(phase_int + 1) & 0xFF] * phase_frac;
-  int32_t value = sA + sB;
-  value -= 0x8000;
-  return (int16_t)value;
-}
+#define PHASE_MAX (1 << PHASE_BITS)
+#define PHASE_HALF (1 << (PHASE_BITS - 1))
+
+// int16_t sample_8_interp(const uint8_t* table, uint16_t phase) {
+//   uint16_t phase_int = phase >> 8;
+//   uint16_t phase_frac = phase & 0xFF;
+// 
+//   uint16_t sA = table[phase_int] * (0x100 - phase_frac);
+//   uint16_t sB = table[(phase_int + 1) & 0xFF] * phase_frac;
+//   int32_t value = sA + sB;
+//   value -= 0x8000;
+//   return (int16_t)value;
+// }
 
 class SquareOsc {
  public:
@@ -54,7 +36,7 @@ class SquareOsc {
 
   q15_t tick() {
     _phase += _phase_inc;
-    return _phase >= 0x8000 ? 0x7FFF : -0x8000;
+    return _phase >= PHASE_HALF ? 0x7FFF : -0x8000;
   }
 
   void reset() { _phase = 0; }
@@ -68,36 +50,45 @@ class SawOsc {
  public:
   SawOsc(uint8_t note) : _phase(0) { setNote(note); }
 
-  void setNote(uint8_t note) { _phase_inc = midi_note_phase_inc[note]; }
+  void setNote(uint8_t note) {
+    _phase_inc = midi_note_phase_inc[note];
+    _freq_inv = midi_note_freq_inv[note];
+  }
 
   q15_t tick() {
+    int32_t val = (2 * _phase - PHASE_MAX) >> (PHASE_BITS - AUDIO_BITS);
+
+    if (_phase < _phase_inc) {
+      int32_t blep_phase = (((_phase * _freq_inv) >> PHASE_BITS) * (SAMPLE_RATE >> SR_SHIFT)) >>
+                           (PHASE_BITS - (AUDIO_BITS + SR_SHIFT));
+      val -= (2 * blep_phase - ((blep_phase * blep_phase) >> AUDIO_BITS) - (1 << AUDIO_BITS));
+    } else if (_phase > (PHASE_MAX - _phase_inc)) {
+      int32_t blep_phase = _phase - PHASE_MAX;
+      blep_phase = (((blep_phase * _freq_inv) >> PHASE_BITS) * (SAMPLE_RATE >> SR_SHIFT)) >>
+                   (PHASE_BITS - (AUDIO_BITS + SR_SHIFT));
+      val -= (2 * blep_phase + ((blep_phase * blep_phase) >> AUDIO_BITS) + (1 << AUDIO_BITS));
+    }
+
     _phase += _phase_inc;
-    return (int32_t)_phase - 0x8000;
+    if (_phase >= PHASE_MAX) {
+      _phase -= PHASE_MAX;
+    }
+
+    return val;
   }
 
   void reset() { _phase = 0; }
 
  private:
-  uint16_t _phase;
-  uint16_t _phase_inc;
+  int32_t _phase;
+  int32_t _phase_inc;
+  int32_t _freq_inv;
 };
 
-class SineOsc {
- public:
-  SineOsc(uint8_t note) : _phase(0) { setNote(note); }
-
-  void setNote(uint8_t note) { _phase_inc = midi_note_phase_inc[note]; }
-
-  q15_t tick() {
-    _phase += _phase_inc;
-    return sample_8_interp(sine_wave, _phase);
-  }
-
-  void reset() { _phase = 0; }
-
- private:
-  uint16_t _phase;
-  uint16_t _phase_inc;
-};
+#undef PHASE_BITS
+#undef PHASE_HALF
+#undef PHASE_MAX
+#undef AUDIO_BITS
+#undef SR_SHIFT
 
 #endif __DSP_OSC_H__

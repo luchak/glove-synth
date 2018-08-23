@@ -1,6 +1,8 @@
 #ifndef __DSP_ACCUMULATOR_H__
 #define __DSP_ACCUMULATOR_H__
 
+#include <Arduino.h>
+
 typedef int16_t q15_t;
 const q15_t ONE_HALF = 1 << 14;
 const uint8_t Q = 15;
