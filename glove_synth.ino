@@ -66,19 +66,19 @@ void audio_callback(uint16_t* buf, uint16_t len) {
 
     mix.asr_floor(3);
 
-    svf.tick(mix.hard_clip());
+    svf.tick(mix.soft_clip());
     mix.set(svf.low());
 
     Accumulator feedback(delay_line.read());
     Accumulator dry_mix(mix);
-    mix.add(feedback.hard_clip());
+    mix.add(feedback.soft_clip());
     feedback.mul_int(3);
     feedback.asr_round(2);
     feedback.add(dry_mix);
     if (numticks & 0x1)
-      delay_line.write(feedback.hard_clip());
+      delay_line.write(feedback.soft_clip());
 
-    q15_t mix_reverb = reverb.tick(mix.hard_clip());
+    q15_t mix_reverb = reverb.tick(mix.soft_clip());
     mix.add(mix_reverb >> 1);
 
     buf[i] = ((int32_t)mix.soft_clip() + 0x8000) >> 6;
@@ -101,27 +101,27 @@ void control_callback() {
   //  if (touch_active[4]) new_voice_mask |= 0x0084;
   //  if (touch_active[5]) new_voice_mask |= 0x0210;
   //  if (touch_active[6]) new_voice_mask |= 0x0820;
-  if (touch_active & (1 << 0)) new_voice_mask |= 0x0001;
-  if (touch_active & (1 << 1)) new_voice_mask |= 0x0004;
-  if (touch_active & (1 << 2)) new_voice_mask |= 0x0010;
-  if (touch_active & (1 << 3)) new_voice_mask |= 0x0020;
-  if (touch_active & (1 << 4)) new_voice_mask |= 0x0080;
-  if (touch_active & (1 << 5)) new_voice_mask |= 0x0200;
-  if (touch_active & (1 << 6)) new_voice_mask |= 0x0800;
-  //if (touch_active & (1 << 0))
-  //  new_voice_mask |= 0x0081;
-  //if (touch_active & (1 << 1))
-  //  new_voice_mask |= 0x0204;
-  //if (touch_active & (1 << 2))
-  //  new_voice_mask |= 0x0810;
-  //if (touch_active & (1 << 3))
-  //  new_voice_mask |= 0x1020;
-  //if (touch_active & (1 << 4))
-  //  new_voice_mask |= 0x0084;
-  //if (touch_active & (1 << 5))
-  //  new_voice_mask |= 0x0210;
-  //if (touch_active & (1 << 6))
-  //  new_voice_mask |= 0x0820;
+  // if (touch_active & (1 << 0)) new_voice_mask |= 0x0001;
+  // if (touch_active & (1 << 1)) new_voice_mask |= 0x0004;
+  // if (touch_active & (1 << 2)) new_voice_mask |= 0x0010;
+  // if (touch_active & (1 << 3)) new_voice_mask |= 0x0020;
+  // if (touch_active & (1 << 4)) new_voice_mask |= 0x0080;
+  // if (touch_active & (1 << 5)) new_voice_mask |= 0x0200;
+  // if (touch_active & (1 << 6)) new_voice_mask |= 0x0800;
+  if (touch_active & (1 << 0))
+    new_voice_mask |= 0x0081;
+  if (touch_active & (1 << 1))
+    new_voice_mask |= 0x0204;
+  if (touch_active & (1 << 2))
+    new_voice_mask |= 0x0810;
+  if (touch_active & (1 << 3))
+    new_voice_mask |= 0x1020;
+  if (touch_active & (1 << 4))
+    new_voice_mask |= 0x0084;
+  if (touch_active & (1 << 5))
+    new_voice_mask |= 0x0210;
+  if (touch_active & (1 << 6))
+    new_voice_mask |= 0x0820;
 
   voice_mask = new_voice_mask;
 
@@ -129,7 +129,7 @@ void control_callback() {
     if (i < 7 && (touch_active & (1 << i))) {
       neopixel_set(NEOPIXEL_NUM_LEDS - 1 - i, 0x08, 0x04, 0x00);
     } else {
-      neopixel_set(NEOPIXEL_NUM_LEDS - 1 - i, 0x02, 0x00, 0x00);
+      neopixel_set(NEOPIXEL_NUM_LEDS - 1 - i, 0x01, 0x00, 0x00);
     }
   }
   // Serial.println(voice_mask);

@@ -8,7 +8,7 @@ const int32_t svf_filter_freq_constant = 4390;
 
 class SVF {
  public:
-  SVF(int16_t freq) : q1_(192), low_(0), high_(0), band_(0) { setFreq(freq); }
+  SVF(int16_t freq) : q1_(208), low_(0), high_(0), band_(0) { setFreq(freq); }
 
   inline void setFreq(int16_t f) {
     freq_ = f;
@@ -36,6 +36,7 @@ class SVF {
   }
 
   inline int16_t freq() const { return freq_; }
+  inline q15_t high() const { return high_.hard_clip(); }
   inline q15_t low() const { return low_.hard_clip(); }
 
  private:

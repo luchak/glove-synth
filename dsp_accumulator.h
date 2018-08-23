@@ -4,6 +4,9 @@
 #include <Arduino.h>
 
 typedef int16_t q15_t;
+const int32_t TWO = 1 << 16;
+const q15_t ONE = 0x7EEE;
+const q15_t MINUS_ONE = -0x8000;
 const q15_t ONE_HALF = 1 << 14;
 const uint8_t Q = 15;
 
@@ -64,17 +67,34 @@ class Accumulator {
   inline q15_t hard_clip() const { return min(max(val_, -0x8000), 0x7FFF); }
 
   inline q15_t soft_clip() const {
-    const uint8_t QSAFE = 13;
-    int32_t x = val_ >> (Q - QSAFE);
-    x = x > (3 << 13) ? (3 << 13) : x;
-    x = x < (-(3 << 13)) ? (-(3 << 13)) : x;
-    int32_t x2 = (x * x) >> QSAFE;
-    int32_t num = (27 << QSAFE) + x2;
-    int32_t den = (27 << QSAFE) + 9 * x2;
-    int32_t frac = (num * (1 << QSAFE)) / den;
-    int32_t result = (frac * x) >> (2 * QSAFE - Q);
-    return min(max(result, -0x8000), 0x7FFF);
+    // const uint8_t QSAFE = 13;
+    // int32_t x = val_ >> (Q - QSAFE);
+    // x = x > (3 << 13) ? (3 << 13) : x;
+    // x = x < (-(3 << 13)) ? (-(3 << 13)) : x;
+    // int32_t x2 = (x * x) >> QSAFE;
+    // int32_t num = (27 << QSAFE) + x2;
+    // int32_t den = (27 << QSAFE) + 9 * x2;
+    // int32_t frac = (num * (1 << QSAFE)) / den;
+    // int32_t result = (frac * x) >> (2 * QSAFE - Q);
+    // return min(max(result, -0x8000), 0x7FFF);
+
+    if (val_ >= TWO) {
+      return ONE;
+    } else if (val_ <= -TWO) {
+      return MINUS_ONE;
+    } else {
+      int32_t halfx = val_ >> 1;
+      int32_t halfx3 = (halfx*halfx) >> Q;
+      halfx3 = (halfx3*halfx) >> Q;
+      return (q15_t)((3*halfx + halfx3) >> 1);
+    }
   }
+
+  #undef TWO
+  #undef ONE
+  #undef MINUS_ONE
+  #undef ONE_HALF
+  #undef Q
 
  private:
   int32_t val_;
