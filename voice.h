@@ -1,0 +1,4 @@
+class Voice {
+ public:
+  Voice() {}
+};
